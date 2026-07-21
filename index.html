@@ -1,1 +1,787 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rhythm Game Trainer</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #1e1e2f;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
 
+        #header {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        #game-container {
+            width: 420px;
+            height: 600px;
+            background-color: #2a2a40;
+            margin-top: 20px;
+            position: relative;
+            border: 4px solid #444;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* 왼쪽 상단 Exit 버튼 */
+        #exit-btn {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            padding: 6px 14px;
+            border-radius: 8px;
+            background-color: #ff4757;
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 25;
+            display: none; /* 메뉴에서는 보이지 않음 */
+            transition: 0.2s;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+        }
+        #exit-btn:hover {
+            background-color: #ff6b6b;
+            transform: scale(1.05);
+        }
+
+        /* 오른쪽 상단 ? (도움말) 버튼 */
+        #help-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #546de5;
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 25;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+        }
+        #help-btn:hover {
+            background-color: #3dc1d3;
+            transform: scale(1.1);
+        }
+
+        /* 레인 영역 */
+        #lane-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+        }
+
+        .lane {
+            height: 100%;
+            flex: 1;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            box-sizing: border-box;
+            position: relative;
+            transition: background-color 0.05s ease;
+        }
+        .lane:last-child { border-right: none; }
+        
+        /* 키 눌렀을 때 레인 강조 피드백 */
+        .lane.active-lane {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* 판정선 설정 */
+        .hit-zone {
+            position: absolute;
+            bottom: 60px;
+            width: 100%;
+            height: 30px;
+            background-color: rgba(255, 255, 255, 0.15);
+            border-top: 2px solid #ff4757;
+            border-bottom: 2px solid #ff4757;
+            box-sizing: border-box;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .key-label {
+            position: absolute;
+            bottom: 15px;
+            width: 100%;
+            text-align: center;
+            font-size: 15px;
+            font-weight: bold;
+            color: #ccc;
+            word-break: break-all;
+            pointer-events: none;
+        }
+
+        .note {
+            position: absolute;
+            width: 100%;
+            height: 30px;
+            background-color: #1dd1a1;
+            border-radius: 5px;
+            top: -30px;
+            box-shadow: 0 0 10px #1dd1a1;
+            z-index: 3;
+        }
+
+        /* 스페이스바 레인 색상 구분 (7키용) */
+        .lane.center-space .note {
+            background-color: #ffda79;
+            box-shadow: 0 0 10px #ffda79;
+        }
+
+        /* 판정 텍스트 연출 */
+        #judgment {
+            position: absolute;
+            top: 35%;
+            width: 100%;
+            text-align: center;
+            font-size: 32px;
+            font-weight: 900;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+            z-index: 5;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: transform 0.08s ease-out, opacity 0.15s ease-out;
+        }
+        #judgment.show {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        /* 메뉴, 키설정, 도움말 화면 모달 공통 */
+        #menu, #key-modal, #help-modal {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(30, 30, 47, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        #key-modal {
+            background-color: rgba(20, 20, 35, 0.98);
+            display: none;
+            z-index: 30;
+            overflow-y: auto;
+        }
+
+        #help-modal {
+            background-color: rgba(20, 20, 35, 0.96);
+            display: none;
+            z-index: 35;
+            padding: 25px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        #help-modal h2 {
+            color: #ffda79;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        #help-modal .help-content {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            line-height: 1.6;
+            color: #e0e0e0;
+            font-size: 15px;
+            margin-bottom: 25px;
+            word-break: keep-all;
+            text-align: center;
+        }
+
+        /* 모드 선택 탭 */
+        .mode-toggle-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            padding: 10px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border: 2px solid #546de5;
+            background-color: transparent;
+            color: white;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .mode-btn.active {
+            background-color: #546de5;
+            box-shadow: 0 0 10px #546de5;
+        }
+
+        /* 속도 조절 UI */
+        .speed-control-container {
+            width: 80%;
+            margin-bottom: 15px;
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .speed-control-container label {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffda79;
+        }
+
+        #speed-slider {
+            width: 100%;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        .song-btn, .setting-btn {
+            margin: 6px;
+            padding: 12px 20px;
+            width: 80%;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            transition: 0.2s;
+        }
+        .song-btn:hover, .setting-btn:hover { 
+            background-color: #ff4757; 
+            transform: scale(1.03); 
+        }
+
+        .setting-btn {
+            background-color: #546de5;
+            margin-top: 10px;
+        }
+        .setting-btn:hover {
+            background-color: #3dc1d3;
+        }
+
+        /* 키 설정 목록 */
+        #key-list-container {
+            width: 80%;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+
+        .key-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 6px 0;
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        .key-change-btn {
+            padding: 6px 14px;
+            font-size: 14px;
+            font-weight: bold;
+            background-color: #33d9b2;
+            color: #1e1e2f;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            min-width: 80px;
+        }
+        .key-change-btn.waiting {
+            background-color: #ffda79;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        #score-board {
+            display: flex;
+            justify-content: space-between;
+            width: 420px;
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <h1>Rhythm Game Trainer</h1>
+        <p>Current Key (<span id="mode-text">4Key</span>): <span id="key-display-header">D, F, J, K</span></p>
+    </div>
+
+    <div id="score-board">
+        <div>Score: <span id="score">0</span></div>
+        <div>Combo: <span id="combo">0</span></div>
+    </div>
+
+    <div id="game-container">
+        <button id="exit-btn" onclick="exitGame()" title="메뉴로 나가기 (ESC)">Exit</button>
+        <button id="help-btn" onclick="openHelpModal()" title="게임 설명">?</button>
+
+        <div id="judgment"></div>
+        <div class="hit-zone"></div>
+        <div id="lane-container"></div>
+
+        <div id="menu">
+            <div class="mode-toggle-container">
+                <button class="mode-btn active" id="btn-4k" onclick="setKeyMode(4)">4 Keys</button>
+                <button class="mode-btn" id="btn-7k" onclick="setKeyMode(7)">7 Keys</button>
+            </div>
+
+            <!-- 속도 조절 UI : max 값을 9.0으로 수정했습니다 -->
+            <div class="speed-control-container">
+                <label for="speed-slider">노트 낙하 속도: <span id="speed-display">1.5</span>x</label>
+                <input type="range" id="speed-slider" min="0.5" max="9.0" step="0.1" value="1.5" oninput="updateSpeedDisplay()">
+            </div>
+
+            <h2>BPM을 선택하세요.</h2>
+            <button class="song-btn" onclick="startGame(0)">1. 100BPM (Easy)</button>
+            <button class="song-btn" onclick="startGame(1)">2. 130BPM (Normal)</button>
+            <button class="song-btn" onclick="startGame(2)">3. 160BPM (Hard)</button>
+            <button class="song-btn" onclick="startGame(3)">4. 200BPM (Expert)</button>
+            <button class="setting-btn" onclick="openKeyModal()">Key Binding</button>
+        </div>
+
+        <div id="key-modal">
+            <h2 id="modal-title">Key Change (4Key)</h2>
+            <div id="key-list-container"></div>
+            <button class="setting-btn" style="margin-top: 15px;" onclick="closeKeyModal()">저장 및 닫기</button>
+        </div>
+
+        <div id="help-modal">
+            <h2>&lt; Rhythm Game Trainer &gt;</h2>
+            <div class="help-content">
+                다양한 박자(4비트, 8비트, 16비트, 32비트)로 노트가 무작위 생성됩니다.<br><br>
+                메뉴에서 자신에게 맞는 키 배열과 <b>노트 속도 배속</b>을 설정하고 연습해보세요.<br><br>
+                연주를 중단하려면 ESC나 Exit 버튼을 누르세요.
+            </div>
+            <button class="setting-btn" style="width: 50%; margin-top: 0;" onclick="closeHelpModal()">닫기</button>
+        </div>
+    </div>
+
+    <script>
+        const songs = [
+            { title: "Easy", bpm: 100, speed: 0.35 },
+            { title: "Normal", bpm: 130, speed: 0.5 },
+            { title: "Hard", bpm: 160, speed: 0.7 },
+            { title: "Expert", bpm: 200, speed: 0.95 }
+        ];
+
+        const INITIAL_Y = -30;
+        const TARGET_Y = 510; 
+        const DISTANCE = TARGET_Y - INITIAL_Y; 
+
+        let currentMode = 4;
+        let userSpeedMultiplier = 1.5; 
+
+        const keyPresets = {
+            4: ['d', 'f', 'j', 'k'],
+            7: ['s', 'd', 'f', ' ', 'j', 'k', 'l']
+        };
+
+        let changingKeyIndex = -1;
+        let score = 0;
+        let combo = 0;
+        let isPlaying = false;
+        let isPaused = false;
+        let pauseStartTime = 0;
+
+        let notes = [];
+        let currentSong = null;
+        let animationFrameId = null;
+
+        let lastSpawnTime = 0;
+        let nextSpawnDelay = 0;
+
+        const scoreEl = document.getElementById('score');
+        const comboEl = document.getElementById('combo');
+        const menuEl = document.getElementById('menu');
+        const keyModalEl = document.getElementById('key-modal');
+        const helpModalEl = document.getElementById('help-modal');
+        const judgmentEl = document.getElementById('judgment');
+        const exitBtn = document.getElementById('exit-btn');
+        const laneContainer = document.getElementById('lane-container');
+        let laneElements = [];
+
+        function updateSpeedDisplay() {
+            const slider = document.getElementById('speed-slider');
+            userSpeedMultiplier = parseFloat(slider.value);
+            document.getElementById('speed-display').innerText = userSpeedMultiplier.toFixed(1);
+        }
+
+        function stopAllTimers() {
+            if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+        }
+
+        function calculateNextDelay() {
+            const beatDuration = 60000 / currentSong.bpm; 
+            const noteTypes = [1, 1, 1, 0.5, 0.5, 0.5, 0.25, 0.25, 0.125];
+            const randomType = noteTypes[Math.floor(Math.random() * noteTypes.length)];
+            
+            return beatDuration * randomType;
+        }
+
+        function openHelpModal() {
+            if (isPlaying && !isPaused) {
+                isPaused = true;
+                pauseStartTime = performance.now();
+                stopAllTimers();
+            }
+            helpModalEl.style.display = 'flex';
+        }
+
+        function closeHelpModal() {
+            helpModalEl.style.display = 'none';
+            if (isPlaying && isPaused) {
+                isPaused = false;
+                const pauseDuration = performance.now() - pauseStartTime;
+                
+                lastSpawnTime += pauseDuration;
+
+                notes.forEach(note => {
+                    note.spawnTime += pauseDuration;
+                    note.targetTime += pauseDuration;
+                });
+
+                gameLoop();
+            }
+        }
+
+        function setKeyMode(mode) {
+            if (isPlaying) return;
+            currentMode = mode;
+            document.getElementById('btn-4k').classList.toggle('active', mode === 4);
+            document.getElementById('btn-7k').classList.toggle('active', mode === 7);
+            document.getElementById('mode-text').innerText = `${mode}Key`;
+            
+            buildLanes();
+            updateKeyLabels();
+        }
+
+        function buildLanes() {
+            laneContainer.innerHTML = '';
+            laneElements = [];
+
+            for (let i = 0; i < currentMode; i++) {
+                const laneDiv = document.createElement('div');
+                laneDiv.className = 'lane';
+                laneDiv.id = `lane-${i}`;
+
+                if (currentMode === 7 && i === 3) {
+                    laneDiv.classList.add('center-space');
+                }
+
+                const labelDiv = document.createElement('div');
+                labelDiv.className = 'key-label';
+                labelDiv.id = `label-${i}`;
+                
+                laneDiv.appendChild(labelDiv);
+                laneContainer.appendChild(laneDiv);
+                laneElements.push(laneDiv);
+            }
+        }
+
+        function updateKeyLabels() {
+            const activeKeys = keyPresets[currentMode];
+            for (let i = 0; i < currentMode; i++) {
+                const labelText = activeKeys[i] === ' ' ? 'SPACE' : activeKeys[i].toUpperCase();
+                const labelEl = document.getElementById(`label-${i}`);
+                if (labelEl) labelEl.innerText = labelText;
+            }
+            const headerStr = activeKeys.map(k => k === ' ' ? 'SPACE' : k.toUpperCase()).join(', ');
+            document.getElementById('key-display-header').innerText = headerStr;
+        }
+
+        function openKeyModal() {
+            document.getElementById('modal-title').innerText = `Key Change (${currentMode}Key)`;
+            const listContainer = document.getElementById('key-list-container');
+            listContainer.innerHTML = '';
+
+            const activeKeys = keyPresets[currentMode];
+
+            for (let i = 0; i < currentMode; i++) {
+                const row = document.createElement('div');
+                row.className = 'key-row';
+
+                const labelName = (currentMode === 7 && i === 3) ? 'Center (Space)' : `Line ${i + 1}`;
+                const keyText = activeKeys[i] === ' ' ? 'SPACE' : activeKeys[i].toUpperCase();
+
+                row.innerHTML = `
+                    <span>${labelName}:</span>
+                    <button class="key-change-btn" id="key-btn-${i}" onclick="startRebind(${i})">${keyText}</button>
+                `;
+                listContainer.appendChild(row);
+            }
+            keyModalEl.style.display = 'flex';
+        }
+
+        function closeKeyModal() {
+            if (changingKeyIndex !== -1) {
+                const btn = document.getElementById(`key-btn-${changingKeyIndex}`);
+                if (btn) btn.classList.remove('waiting');
+                changingKeyIndex = -1;
+            }
+            keyModalEl.style.display = 'none';
+        }
+
+        function startRebind(index) {
+            const activeKeys = keyPresets[currentMode];
+            if (changingKeyIndex !== -1) {
+                const prevBtn = document.getElementById(`key-btn-${changingKeyIndex}`);
+                if (prevBtn) {
+                    prevBtn.classList.remove('waiting');
+                    prevBtn.innerText = activeKeys[changingKeyIndex] === ' ' ? 'SPACE' : activeKeys[changingKeyIndex].toUpperCase();
+                }
+            }
+            changingKeyIndex = index;
+            const btn = document.getElementById(`key-btn-${index}`);
+            btn.classList.add('waiting');
+            btn.innerText = '입력...';
+        }
+
+        function startGame(songIndex) {
+            stopAllTimers();
+            currentSong = songs[songIndex];
+            score = 0;
+            combo = 0;
+            isPlaying = true;
+            isPaused = false;
+            
+            notes.forEach(n => n.element.remove());
+            notes = [];
+
+            updateScore();
+            menuEl.style.display = 'none';
+            exitBtn.style.display = 'block';
+
+            lastSpawnTime = performance.now();
+            nextSpawnDelay = 0;
+
+            gameLoop();
+        }
+
+        function spawnNote(exactSpawnTime) {
+            if (!isPlaying || isPaused) return;
+
+            const laneIndex = Math.floor(Math.random() * currentMode);
+            const noteEl = document.createElement('div');
+            noteEl.classList.add('note');
+            
+            const actualSpeed = currentSong.speed * userSpeedMultiplier;
+            const travelTime = DISTANCE / actualSpeed;
+
+            const note = {
+                y: INITIAL_Y,
+                element: noteEl,
+                lane: laneIndex,
+                spawnTime: exactSpawnTime,
+                targetTime: exactSpawnTime + travelTime
+            };
+            
+            if (laneElements[laneIndex]) {
+                laneElements[laneIndex].appendChild(noteEl);
+                notes.push(note);
+            }
+        }
+
+        function gameLoop() {
+            if (!isPlaying || isPaused) return;
+
+            const now = performance.now();
+
+            while (now - lastSpawnTime >= nextSpawnDelay) {
+                lastSpawnTime += nextSpawnDelay;
+                spawnNote(lastSpawnTime);
+                nextSpawnDelay = calculateNextDelay();
+            }
+
+            const actualSpeed = currentSong.speed * userSpeedMultiplier;
+
+            for (let i = notes.length - 1; i >= 0; i--) {
+                let note = notes[i];
+                let elapsedTime = now - note.spawnTime;
+                
+                note.y = INITIAL_Y + (elapsedTime * actualSpeed);
+                note.element.style.top = note.y + 'px';
+
+                if (now - note.targetTime > 100) {
+                    displayJudgment("MISS", "#ff4757");
+                    note.element.remove();
+                    notes.splice(i, 1);
+                    combo = 0;
+                    updateScore();
+                }
+            }
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function exitGame() {
+            if (!isPlaying) return;
+            stopAllTimers();
+            isPlaying = false;
+            isPaused = false;
+
+            notes.forEach(note => note.element.remove());
+            notes = [];
+
+            score = 0;
+            combo = 0;
+            updateScore();
+
+            exitBtn.style.display = 'none'; 
+            menuEl.style.display = 'flex';
+            judgmentEl.innerText = "";
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (changingKeyIndex !== -1) {
+                    closeKeyModal();
+                    return;
+                }
+                if (helpModalEl.style.display === 'flex') {
+                    closeHelpModal();
+                    return;
+                }
+                if (isPlaying) {
+                    exitGame();
+                    return;
+                }
+            }
+
+            if (changingKeyIndex !== -1) {
+                e.preventDefault();
+
+                let pressedKey = e.key === ' ' ? ' ' : e.key.toLowerCase();
+                const activeKeys = keyPresets[currentMode];
+
+                const existingIndex = activeKeys.indexOf(pressedKey);
+                if (existingIndex !== -1 && existingIndex !== changingKeyIndex) {
+                    alert(`'${pressedKey === ' ' ? 'SPACE' : pressedKey.toUpperCase()}' 키는 이미 다른 레인에 사용 중입니다.`);
+                    return;
+                }
+
+                activeKeys[changingKeyIndex] = pressedKey;
+                changingKeyIndex = -1;
+                updateKeyLabels();
+                openKeyModal();
+                return;
+            }
+
+            if (helpModalEl.style.display === 'flex' || !isPlaying || isPaused) return;
+
+            const activeKeys = keyPresets[currentMode];
+            const pressedKey = e.key === ' ' ? ' ' : e.key.toLowerCase();
+            const laneIndex = activeKeys.indexOf(pressedKey);
+
+            if (laneIndex !== -1) {
+                if (pressedKey === ' ') e.preventDefault();
+
+                if (laneElements[laneIndex]) {
+                    laneElements[laneIndex].classList.add('active-lane');
+                    setTimeout(() => laneElements[laneIndex].classList.remove('active-lane'), 80);
+                }
+
+                const now = performance.now();
+                let candidateIndex = -1;
+                let minDiff = Infinity;
+
+                for (let i = 0; i < notes.length; i++) {
+                    if (notes[i].lane === laneIndex) {
+                        let diff = Math.abs(now - notes[i].targetTime);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            candidateIndex = i;
+                        }
+                    }
+                }
+
+                if (candidateIndex !== -1 && minDiff <= 100) {
+                    let judgeText = "";
+                    let judgeColor = "";
+                    let baseScore = 0;
+
+                    if (minDiff <= 20) {
+                        judgeText = "S - PERFECT";
+                        judgeColor = "#00ff88";
+                        baseScore = 150;
+                        combo++;
+                    } else if (minDiff <= 50) {
+                        judgeText = "PERFECT";
+                        judgeColor = "#2ed573";
+                        baseScore = 100;
+                        combo++;
+                    } else if (minDiff <= 80) {
+                        judgeText = "GREAT";
+                        judgeColor = "#70a1ff";
+                        baseScore = 70;
+                        combo++;
+                    } else {
+                        judgeText = "BAD";
+                        judgeColor = "#ffa502";
+                        baseScore = 30;
+                        combo++;
+                    }
+
+                    displayJudgment(judgeText, judgeColor);
+                    score += baseScore + Math.floor(combo * 1.5);
+                    
+                    notes[candidateIndex].element.remove();
+                    notes.splice(candidateIndex, 1);
+                    updateScore();
+                }
+            }
+        });
+
+        function displayJudgment(text, color) {
+            judgmentEl.innerText = text;
+            judgmentEl.style.color = color;
+            
+            judgmentEl.classList.remove('show');
+            void judgmentEl.offsetWidth;
+            judgmentEl.classList.add('show');
+        }
+
+        function updateScore() {
+            scoreEl.innerText = score;
+            comboEl.innerText = combo;
+        }
+
+        setKeyMode(4);
+    </script>
+</body>
+</html>
